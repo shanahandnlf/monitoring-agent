@@ -1,0 +1,222 @@
+services:
+  agent-zone-a:
+    image: monitoring-agent:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        APP: agent
+    environment:
+      AGENT_LISTEN_ADDRESS: :9100
+      AGENT_ZONE: zone-a
+    networks:
+      - zone_a_net
+
+  agent-zone-b:
+    image: monitoring-agent:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        APP: agent
+    environment:
+      AGENT_LISTEN_ADDRESS: :9100
+      AGENT_ZONE: zone-b
+    networks:
+      - zone_b_net
+
+  demo-app-zone-a:
+    image: monitoring-demo-app:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        APP: demo-app
+    environment:
+      DEMO_LISTEN_ADDRESS: :8080
+      DEMO_ZONE: zone-a
+      DEMO_SERVICE_NAME: payments-api
+      DEMO_LOGSTASH_URL: http://bigip-mock:18080
+      DEMO_ERROR_RATE: "0.15"
+    networks:
+      - zone_a_net
+
+  demo-app-zone-b:
+    image: monitoring-demo-app:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        APP: demo-app
+    environment:
+      DEMO_LISTEN_ADDRESS: :8080
+      DEMO_ZONE: zone-b
+      DEMO_SERVICE_NAME: lending-api
+      DEMO_LOGSTASH_URL: http://bigip-mock:18080
+      DEMO_ERROR_RATE: "0.10"
+    networks:
+      - zone_b_net
+
+  traffic-zone-a:
+    image: curlimages/curl:8.9.1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "while true; do curl -fsS http://demo-app-zone-a:8080/api/demo >/dev/null || true; sleep 5; done"
+    depends_on:
+      - demo-app-zone-a
+    networks:
+      - zone_a_net
+
+  traffic-zone-b:
+    image: curlimages/curl:8.9.1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "while true; do curl -fsS http://demo-app-zone-b:8080/api/demo >/dev/null || true; sleep 5; done"
+    depends_on:
+      - demo-app-zone-b
+    networks:
+      - zone_b_net
+
+  blackbox-zone-a:
+    image: prom/blackbox-exporter:v0.25.0
+    cap_add:
+      - NET_RAW
+    command:
+      - --config.file=/etc/blackbox_exporter/blackbox.yml
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro
+    networks:
+      - zone_a_net
+
+  blackbox-zone-b:
+    image: prom/blackbox-exporter:v0.25.0
+    cap_add:
+      - NET_RAW
+    command:
+      - --config.file=/etc/blackbox_exporter/blackbox.yml
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro
+    networks:
+      - zone_b_net
+
+  prometheus-zone-a:
+    image: prom/prometheus:v2.52.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/zone-a.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9091:9090"
+    depends_on:
+      - agent-zone-a
+      - demo-app-zone-a
+      - blackbox-zone-a
+    networks:
+      - zone_a_net
+
+  prometheus-zone-b:
+    image: prom/prometheus:v2.52.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/zone-b.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9092:9090"
+    depends_on:
+      - agent-zone-b
+      - demo-app-zone-b
+      - blackbox-zone-b
+    networks:
+      - zone_b_net
+
+  bigip-mock:
+    image: haproxy:2.9-alpine
+    volumes:
+      - ./bigip/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "8404:8404"
+    depends_on:
+      - prometheus-zone-a
+      - prometheus-zone-b
+      - logstash
+    networks:
+      - zone_a_net
+      - zone_b_net
+      - core_net
+
+  prometheus-central:
+    image: prom/prometheus:v2.52.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/central.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - bigip-mock
+    networks:
+      - core_net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    networks:
+      - core_net
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.15.0
+    environment:
+      LS_JAVA_OPTS: -Xms256m -Xmx256m
+    volumes:
+      - ./elk/logstash/pipeline.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    ports:
+      - "18080:8080"
+    depends_on:
+      - elasticsearch
+    networks:
+      - core_net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - core_net
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus-central
+      - elasticsearch
+    networks:
+      - core_net
+
+networks:
+  zone_a_net:
+  zone_b_net:
+  core_net:

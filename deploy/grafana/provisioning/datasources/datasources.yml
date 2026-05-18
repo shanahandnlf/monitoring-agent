@@ -1,0 +1,22 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus Central
+    uid: prometheus-central
+    type: prometheus
+    access: proxy
+    url: http://prometheus-central:9090
+    isDefault: true
+
+  - name: Elasticsearch Logs
+    uid: elasticsearch-logs
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    jsonData:
+      esVersion: 8
+      index: "[demo-app-logs-]YYYY.MM.DD"
+      interval: Daily
+      timeField: "@timestamp"
+      logMessageField: message
+      logLevelField: status
