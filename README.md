@@ -25,6 +25,49 @@ Pastikan sudah tersedia:
 
 ## Cara Menjalankan
 
+Project ini punya dua mode sesuai opsi arsitektur di proposal:
+
+- Opsi 1: `Single Prometheus + Agent + ELK`
+- Opsi 2: `Federated Prometheus + Agent + ELK`
+
+Keduanya memakai port host yang sama (`3000`, `9090`, `9200`, dan lainnya), jadi jalankan salah satu opsi saja dalam satu waktu.
+
+### Opsi 1 - Single Prometheus
+
+Mode ini menjalankan satu Prometheus central yang scrape agent dan demo app lintas zona melalui HAProxy mock BIG-IP.
+
+```bash
+make up-single
+```
+
+Stop Opsi 1:
+
+```bash
+make down-single
+```
+
+### Opsi 2 - Federated Prometheus
+
+Mode ini menjalankan Prometheus per-zone, lalu Prometheus central mengambil metrik dari setiap zone Prometheus melalui endpoint federation.
+
+```bash
+make up-federated
+```
+
+Stop Opsi 2:
+
+```bash
+make down-federated
+```
+
+Stop semua project opsi:
+
+```bash
+make down
+```
+
+### Manual Docker Compose Opsi 2
+
 Dari root repo, jalankan:
 
 ```bash
@@ -156,4 +199,3 @@ go test ./...
 CGO_ENABLED=0 GOOS=linux go build -o bin/agent ./cmd/agent
 CGO_ENABLED=0 GOOS=linux go build -o bin/demo-app ./cmd/demo-app
 ```
-
