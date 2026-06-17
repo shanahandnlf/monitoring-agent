@@ -267,6 +267,96 @@ username: admin
 password: admin
 ```
 
+## Screenshots Datadog (Opsi 3)
+
+Screenshot untuk Opsi 3 dilihat di aplikasi Datadog (sesuai region `DD_SITE`, contoh di bawah memakai `us5.datadoghq.com`). Jalankan `make up-datadog` lebih dulu dan tunggu 1-2 menit sampai data masuk.
+
+### Datadog Infrastructure
+
+URL:
+
+```text
+https://us5.datadoghq.com/infrastructure
+```
+
+File screenshot:
+
+```text
+docs/screenshots/datadog-infrastructure.png
+```
+
+![Datadog Infrastructure](docs/screenshots/datadog-infrastructure.png)
+
+Tab Infrastructure menunjukkan host yang melaporkan data lewat Datadog Agent per-zona (`node-zone-a`, `node-zone-b`) beserta CPU, memory, dan disk. Banner di kanan atas menandakan akun masih dalam masa free trial 14 hari.
+
+### Datadog Logs
+
+URL:
+
+```text
+https://us5.datadoghq.com/logs
+```
+
+File screenshot:
+
+```text
+docs/screenshots/datadog-logs.png
+```
+
+![Datadog Logs](docs/screenshots/datadog-logs.png)
+
+Log aplikasi demo app dikumpulkan Datadog Agent dari stdout container (JSON) dan di-parse menjadi atribut seperti `host`, `service`, dan `content`. Terlihat request `GET /api/demo` dari `payments-api` dan `lending-api`.
+
+### Datadog APM
+
+URL:
+
+```text
+https://us5.datadoghq.com/apm/traces
+```
+
+File screenshot:
+
+```text
+docs/screenshots/datadog-apm.png
+```
+
+![Datadog APM](docs/screenshots/datadog-apm.png)
+
+APM menampilkan distributed tracing dari demo app yang diinstrumentasi OpenTelemetry (dikirim via OTLP ke Datadog Agent), termasuk sebaran span per durasi untuk service `payments-api`. Filter dengan `env:poc`.
+
+### Datadog Dashboard - Infrastructure Metrics
+
+URL:
+
+```text
+https://us5.datadoghq.com/dashboard/lists
+```
+
+File screenshot:
+
+```text
+docs/screenshots/datadog-dashboard-infra.png
+```
+
+![Datadog Dashboard Infrastructure](docs/screenshots/datadog-dashboard-infra.png)
+
+Dashboard "POC - Segmented Zone Monitoring" hasil import `deploy/datadog/dashboard.json`, menampilkan CPU, memory, swap, dan network per host (`node-zone-a`, `node-zone-b`) dengan filter `zone` dan `host`.
+
+### Datadog Dashboard - Application Metrics
+
+File screenshot:
+
+```text
+docs/screenshots/datadog-dashboard-app.png
+```
+
+![Datadog Dashboard Application](docs/screenshots/datadog-dashboard-app.png)
+
+Bagian bawah dashboard yang sama menampilkan network packet rate, application requests per service, dan total request (panel `query_value`) dari metrik `poc.demo_app_requests.count`.
+
+> Logs dan APM hanya aktif saat free trial / paket berbayar.
+
 ## Cara Melihat Dashboard
 
 1. Buka Grafana:
@@ -302,16 +392,8 @@ Dashboard ini menampilkan:
 Dashboard punya filter:
 
 - `Zone`: pilih `All`, `zone-a`, atau `zone-b`.
-- `Host`: isi regex hostname, default `.*` untuk semua host.
+- `Host`: pilih `All`, `node-zone-a`, atau `node-zone-b`. Filter ini berlaku untuk metrik maupun log aplikasi karena agent dan demo app dalam satu zona memakai identitas host yang sama.
 - `Log Status`: pilih `All logs` atau `5xx errors only`.
-
-Contoh filter satu host:
-
-```text
-Host = 18064c220071
-```
-
-Catatan untuk PoC Docker: hostname agent dan hostname demo app bisa berbeda karena berjalan sebagai container terpisah. Di production, nilai ini bisa disamakan dengan hostname VM/server.
 
 ## Toggle Synthetic Error
 
