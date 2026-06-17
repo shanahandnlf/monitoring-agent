@@ -24,7 +24,7 @@ func Load(args []string) (Config, error) {
 
 func (c Config) BaseLabels() map[string]string {
 	labels := map[string]string{
-		"hostname": c.Hostname,
+		"host": c.Hostname,
 		"os":       c.OperatingSystem,
 	}
 
@@ -45,11 +45,15 @@ func load(args []string, lookupEnv func(string) (string, bool), hostname func() 
 
 	cfg.NetworkInterfaces = splitCSV(envString(lookupEnv, "AGENT_NETWORK_INTERFACES", ""))
 
-	resolvedHostname, err := hostname()
-	if err != nil || resolvedHostname == "" {
-		resolvedHostname = "unknown"
+	if override := envString(lookupEnv, "AGENT_HOSTNAME", ""); override != "" {
+		cfg.Hostname = override
+	} else {
+		resolvedHostname, err := hostname()
+		if err != nil || resolvedHostname == "" {
+			resolvedHostname = "unknown"
+		}
+		cfg.Hostname = resolvedHostname
 	}
-	cfg.Hostname = resolvedHostname
 
 	networkInterfaces := strings.Join(cfg.NetworkInterfaces, ",")
 

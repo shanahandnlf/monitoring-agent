@@ -31,6 +31,25 @@ func TestLoadUsesFlags(t *testing.T) {
 	}
 }
 
+func TestLoadHostnameOverride(t *testing.T) {
+	cfg, err := load(
+		nil,
+		func(key string) (string, bool) {
+			if key == "AGENT_HOSTNAME" {
+				return "10.10.1.5", true
+			}
+			return "", false
+		},
+		func() (string, error) { return "os-hostname", nil },
+	)
+	if err != nil {
+		t.Fatalf("load() error = %v", err)
+	}
+	if cfg.Hostname != "10.10.1.5" {
+		t.Fatalf("Hostname = %q, want 10.10.1.5", cfg.Hostname)
+	}
+}
+
 func TestLoadUsesEnvironmentDefaults(t *testing.T) {
 	env := map[string]string{
 		"AGENT_LISTEN_ADDRESS":     ":9300",

@@ -6,9 +6,11 @@ services:
       dockerfile: Dockerfile
       args:
         APP: agent
+    hostname: agent-zone-a
     environment:
       AGENT_LISTEN_ADDRESS: :9100
       AGENT_ZONE: zone-a
+      AGENT_HOSTNAME: node-zone-a
     networks:
       - zone_a_net
 
@@ -19,9 +21,11 @@ services:
       dockerfile: Dockerfile
       args:
         APP: agent
+    hostname: agent-zone-b
     environment:
       AGENT_LISTEN_ADDRESS: :9100
       AGENT_ZONE: zone-b
+      AGENT_HOSTNAME: node-zone-b
     networks:
       - zone_b_net
 
@@ -32,12 +36,15 @@ services:
       dockerfile: Dockerfile
       args:
         APP: demo-app
+    hostname: demo-app-zone-a
     environment:
       DEMO_LISTEN_ADDRESS: :8080
       DEMO_ZONE: zone-a
       DEMO_SERVICE_NAME: payments-api
       DEMO_LOGSTASH_URL: http://bigip-mock:18080
-      DEMO_ERROR_RATE: "0.15"
+      DEMO_ERROR_RATE: "0"
+      DEMO_HOSTNAME: node-zone-a
+      DEMO_HOST_IP: 10.20.1.11
     networks:
       - zone_a_net
 
@@ -48,12 +55,15 @@ services:
       dockerfile: Dockerfile
       args:
         APP: demo-app
+    hostname: demo-app-zone-b
     environment:
       DEMO_LISTEN_ADDRESS: :8080
       DEMO_ZONE: zone-b
       DEMO_SERVICE_NAME: lending-api
       DEMO_LOGSTASH_URL: http://bigip-mock:18080
-      DEMO_ERROR_RATE: "0.10"
+      DEMO_ERROR_RATE: "0"
+      DEMO_HOSTNAME: node-zone-b
+      DEMO_HOST_IP: 10.20.1.21
     networks:
       - zone_b_net
 
