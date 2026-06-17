@@ -20,3 +20,9 @@ datasources:
       timeField: "@timestamp"
       logMessageField: message
       logLevelField: status
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200

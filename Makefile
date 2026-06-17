@@ -2,9 +2,23 @@ COMPOSE := docker compose
 COMPOSE_FILE := deploy/docker-compose.yml
 SINGLE_FILE := deploy/docker-compose.single.yml
 ERRORS_FILE := deploy/docker-compose.errors.yml
+DATADOG_FILE := deploy/docker-compose.datadog.yml
+TRACING_FILE := deploy/docker-compose.tracing.yml
 FEDERATED_PROJECT := monitoring-poc-federated
 SINGLE_PROJECT := monitoring-poc-single
+DATADOG_PROJECT := monitoring-poc-datadog
+TRACING_PROJECT := monitoring-poc-tracing
 DEMO_SERVICES := demo-app-zone-a demo-app-zone-b
+
+DATADOG_SERVICES := \
+	agent-zone-a \
+	agent-zone-b \
+	demo-app-zone-a \
+	demo-app-zone-b \
+	traffic-zone-a \
+	traffic-zone-b \
+	datadog-agent-zone-a \
+	datadog-agent-zone-b
 
 SINGLE_SERVICES := \
 	agent-zone-a \
@@ -21,7 +35,7 @@ SINGLE_SERVICES := \
 	prometheus-central \
 	grafana
 
-.PHONY: help build build-linux build-windows up-single up-federated down-single down-federated down reset-federated reset-single ps-single ps-federated logs-single logs-federated errors-on errors-off errors-on-federated errors-off-federated errors-on-single errors-off-single test
+.PHONY: help build build-linux build-windows up-single up-federated up-datadog up-tracing down-single down-federated down-datadog down-tracing down reset-federated reset-single reset-datadog reset-tracing ps-single ps-federated ps-datadog ps-tracing logs-single logs-federated logs-datadog logs-tracing errors-on errors-off errors-on-federated errors-off-federated errors-on-single errors-off-single test
 
 help:
 	@echo "Available targets:"
@@ -30,6 +44,8 @@ help:
 	@echo "  make build-windows  Cross-compile windows/amd64 binaries"
 	@echo "  make up-single      Run Opsi 1: Single Prometheus + Agent + ELK"
 	@echo "  make up-federated   Run Opsi 2: Federated Prometheus + Agent + ELK"
+	@echo "  make up-datadog     Run Opsi 3: Datadog Agent (free tier, butuh DD_API_KEY di .env)"
+	@echo "  make up-tracing     Run Opsi 1/2 + Grafana Tempo (distributed tracing on-prem)"
 	@echo "  make down-single    Stop Opsi 1 containers"
 	@echo "  make down-federated Stop Opsi 2 containers"
 	@echo "  make down           Stop both option projects"
@@ -111,6 +127,36 @@ errors-on-single:
 
 errors-off-single:
 	$(COMPOSE) -p $(SINGLE_PROJECT) -f $(COMPOSE_FILE) -f $(SINGLE_FILE) up -d --no-deps $(DEMO_SERVICES)
+
+up-datadog:
+	$(COMPOSE) --env-file .env -p $(DATADOG_PROJECT) -f $(COMPOSE_FILE) -f $(DATADOG_FILE) up --build --no-deps $(DATADOG_SERVICES)
+
+down-datadog:
+	$(COMPOSE) --env-file .env -p $(DATADOG_PROJECT) -f $(COMPOSE_FILE) -f $(DATADOG_FILE) down
+
+reset-datadog:
+	$(COMPOSE) --env-file .env -p $(DATADOG_PROJECT) -f $(COMPOSE_FILE) -f $(DATADOG_FILE) down -v
+
+ps-datadog:
+	$(COMPOSE) --env-file .env -p $(DATADOG_PROJECT) -f $(COMPOSE_FILE) -f $(DATADOG_FILE) ps
+
+logs-datadog:
+	$(COMPOSE) --env-file .env -p $(DATADOG_PROJECT) -f $(COMPOSE_FILE) -f $(DATADOG_FILE) logs -f
+
+up-tracing:
+	$(COMPOSE) -p $(TRACING_PROJECT) -f $(COMPOSE_FILE) -f $(TRACING_FILE) up --build
+
+down-tracing:
+	$(COMPOSE) -p $(TRACING_PROJECT) -f $(COMPOSE_FILE) -f $(TRACING_FILE) down
+
+reset-tracing:
+	$(COMPOSE) -p $(TRACING_PROJECT) -f $(COMPOSE_FILE) -f $(TRACING_FILE) down -v
+
+ps-tracing:
+	$(COMPOSE) -p $(TRACING_PROJECT) -f $(COMPOSE_FILE) -f $(TRACING_FILE) ps
+
+logs-tracing:
+	$(COMPOSE) -p $(TRACING_PROJECT) -f $(COMPOSE_FILE) -f $(TRACING_FILE) logs -f
 
 test:
 	go test ./...

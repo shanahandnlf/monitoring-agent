@@ -17,6 +17,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type config struct {
@@ -72,6 +74,12 @@ func main() {
 
 	app := newDemoApp(cfg)
 
+	shutdownTracing, err := initTracing(context.Background(), cfg, app.hostname)
+	if err != nil {
+		log.Printf("init tracing: %v", err)
+	}
+	defer func() { _ = shutdownTracing(context.Background()) }()
+
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.HandlerFor(app.registry, promhttp.HandlerOpts{}))
 	mux.HandleFunc("/healthz", app.withAccessLog(app.handleHealthz))
@@ -79,7 +87,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddress,
-		Handler:           mux,
+		Handler:           instrumentHandler(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -246,7 +254,10 @@ func (a *demoApp) handleDemo(w http.ResponseWriter, r *http.Request) {
 	sleepFor := time.Duration(50+a.rng.Intn(250)) * time.Millisecond
 	a.rngMu.Unlock()
 
+	_, span := otel.Tracer("demo-app").Start(r.Context(), "process-demo")
+	span.SetAttributes(attribute.Bool("demo.synthetic_error", isError))
 	time.Sleep(sleepFor)
+	span.End()
 
 	w.Header().Set("Content-Type", "application/json")
 	if isError {
@@ -275,7 +286,7 @@ func (a *demoApp) emitAccessLog(entry accessLog) {
 		return
 	}
 
-	log.Println(string(payload))
+	fmt.Println(string(payload))
 
 	if a.cfg.LogstashURL == "" {
 		return

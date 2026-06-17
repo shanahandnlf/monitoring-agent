@@ -1,0 +1,118 @@
+{
+  "title": "POC - Segmented Zone Monitoring (Datadog / Opsi 3)",
+  "description": "Meniru panel Grafana Opsi 1/2: metrik infrastruktur & aplikasi dari Go agent + demo app yang di-scrape Datadog Agent via OpenMetrics (namespace poc). Filter per zona/host lewat template variable.",
+  "layout_type": "ordered",
+  "reflow_type": "auto",
+  "template_variables": [
+    {
+      "name": "zone",
+      "prefix": "zone",
+      "available_values": [],
+      "default": "*"
+    },
+    {
+      "name": "host",
+      "prefix": "host",
+      "available_values": [],
+      "default": "*"
+    }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "title": "CPU Usage (%)",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "avg:poc.system_cpu_usage_percent{$zone,$host,scope:overall} by {host}",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "min": "0", "max": "100" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Memory Usage (%)",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "avg:poc.system_memory_usage_percent{$zone,$host} by {host}",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "min": "0", "max": "100" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Memory Used vs Available (bytes)",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "avg:poc.system_memory_used_bytes{$zone,$host} by {host}",
+            "display_type": "area"
+          },
+          {
+            "q": "avg:poc.system_memory_available_bytes{$zone,$host} by {host}",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Swap Usage (%)",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "avg:poc.system_swap_usage_percent{$zone,$host} by {host}",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "min": "0", "max": "100" }
+      }
+    },
+    {
+      "definition": {
+        "title": "Network Packet Rate (pps)",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "avg:poc.system_network_receive_packets_per_second{$zone,$host} by {host}",
+            "display_type": "line"
+          },
+          {
+            "q": "avg:poc.system_network_transmit_packets_per_second{$zone,$host} by {host}",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Application Requests (req/s) by service",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "sum:poc.demo_app_requests.count{$zone,$host} by {service}.as_rate()",
+            "display_type": "bars"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "title": "Total Requests (5m)",
+        "type": "query_value",
+        "requests": [
+          {
+            "q": "sum:poc.demo_app_requests.count{$zone,$host}.as_count()",
+            "aggregator": "sum"
+          }
+        ],
+        "precision": 0
+      }
+    }
+  ]
+}

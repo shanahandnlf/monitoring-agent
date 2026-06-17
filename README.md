@@ -25,12 +25,13 @@ Pastikan sudah tersedia:
 
 ## Cara Menjalankan
 
-Project ini punya dua mode sesuai opsi arsitektur di proposal:
+Project ini punya tiga mode sesuai opsi arsitektur:
 
 - Opsi 1: `Single Prometheus + Agent + ELK`
 - Opsi 2: `Federated Prometheus + Agent + ELK`
+- Opsi 3: `Datadog (SaaS)` — metrics + logs + APM ke cloud Datadog (butuh `DD_API_KEY`)
 
-Keduanya memakai port host yang sama (`3000`, `9090`, `9200`, dan lainnya), jadi jalankan salah satu opsi saja dalam satu waktu.
+Semua memakai port host yang sama (`3000`, `9090`, `9200`, dan lainnya), jadi jalankan salah satu opsi saja dalam satu waktu.
 
 Pilih salah satu cara jalan:
 
@@ -38,6 +39,7 @@ Pilih salah satu cara jalan:
 | --- | --- | --- | --- |
 | Federated via Makefile | `make up-federated` | `make down-federated` | `make errors-on-federated` / `make errors-off-federated` |
 | Single via Makefile | `make up-single` | `make down-single` | `make errors-on-single` / `make errors-off-single` |
+| Datadog via Makefile | `make up-datadog` | `make down-datadog` | - |
 | Manual Docker Compose | `docker compose -f deploy/docker-compose.yml up --build` | `docker compose -f deploy/docker-compose.yml down` | `make errors-on` / `make errors-off` |
 
 ### Opsi 1 - Single Prometheus
@@ -67,6 +69,46 @@ Stop Opsi 2:
 ```bash
 make down-federated
 ```
+
+### Opsi 3 - Datadog (SaaS)
+
+Mode ini mengganti paradigma dari self-hosted (Opsi 1/2) menjadi SaaS: Datadog Agent berjalan per-zona, mengumpulkan metrik (via OpenMetrics), log aplikasi, dan trace (APM via OTLP), lalu mem-push semuanya ke cloud Datadog. Tidak ada Prometheus/ELK pada opsi ini.
+
+Beda mendasar dengan Opsi 1/2:
+
+- Data **tersimpan di cloud Datadog** (region lewat `DD_SITE`), bukan on-prem. Tidak ada opsi penyimpanan on-premise, jadi opsi ini **tidak cocok untuk server tanpa internet**.
+- **Logs dan APM** hanya aktif saat **free trial** atau **Paid Plan**.
+
+Prasyarat: akun Datadog + API key. Isi di `.env`:
+
+```bash
+cp .env.example .env
+```
+
+```dotenv
+DD_API_KEY=<api-key-kamu>
+DD_SITE=us5.datadoghq.com
+```
+
+> `DD_SITE` harus cocok dengan region akunmu (mis. `datadoghq.com`, `us5.datadoghq.com`, `ap1.datadoghq.com`), kalau tidak data tidak masuk.
+
+Jalankan:
+
+```bash
+make up-datadog
+make ps-datadog
+make logs-datadog
+make down-datadog
+```
+
+Cek di Datadog (sesuai region `DD_SITE`):
+
+- **Infrastructure > Host Map**: `node-zone-a`, `node-zone-b`
+- **Metrics > Explorer**: `poc.system_cpu_usage_percent`, filter `zone:zone-a`
+- **Logs > Search**: `service:payments-api`
+- **APM > Traces / Services**: filter `env:poc`
+
+Detail lengkap (limitasi free tier, on-premise, setup APM/tracing) ada di [docs/opsi-3-datadog.md](docs/opsi-3-datadog.md) dan [docs/opsi-tracing.md](docs/opsi-tracing.md).
 
 Stop semua project opsi:
 

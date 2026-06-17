@@ -1,0 +1,18 @@
+instances:
+  - openmetrics_endpoint: http://agent-zone-b:9100/metrics
+    namespace: poc
+    metrics:
+      - "system_.*"
+    tags:
+      - "zone:zone-b"
+      - "source:agent"
+      - "host:node-zone-b"
+
+  - openmetrics_endpoint: http://demo-app-zone-b:8080/metrics
+    namespace: poc
+    metrics:
+      - "demo_app_.*"
+    tags:
+      - "zone:zone-b"
+      - "source:demo-app"
+      - "host:node-zone-b"
