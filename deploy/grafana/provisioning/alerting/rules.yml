@@ -1,0 +1,234 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: monitoring-poc
+    folder: Monitoring POC
+    interval: 1m
+    rules:
+      - uid: cpu-usage-high
+        title: CPU usage high
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus-central
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus-central
+              expr: max by (zone, host) (system_cpu_usage_percent{scope="overall"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 85
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: CPU usage is above 85 percent.
+
+      - uid: memory-usage-high
+        title: Memory usage high
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus-central
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus-central
+              expr: max by (zone, host) (system_memory_usage_percent)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 85
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: Memory usage is above 85 percent.
+
+      - uid: availability-probe-failed
+        title: Availability probe failed
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: prometheus-central
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus-central
+              expr: min by (zone, probe_type, instance) (probe_success)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+          component: availability
+        annotations:
+          summary: HTTP, TCP, or ICMP probe is failing.
+
+      - uid: application-errors-detected
+        title: Application 5xx errors detected
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: elasticsearch-logs
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              datasource:
+                type: elasticsearch
+                uid: elasticsearch-logs
+              query: status:[500 TO 599]
+              metrics:
+                - id: "1"
+                  type: count
+              bucketAggs:
+                - field: "@timestamp"
+                  id: "2"
+                  settings:
+                    interval: auto
+                  type: date_histogram
+              refId: A
+              timeField: "@timestamp"
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: One or more 5xx application log events were found in Elasticsearch.

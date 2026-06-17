@@ -1,0 +1,18 @@
+services:
+  blackbox-central:
+    image: prom/blackbox-exporter:v0.25.0
+    cap_add:
+      - NET_RAW
+    command:
+      - --config.file=/etc/blackbox_exporter/blackbox.yml
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro
+    networks:
+      - core_net
+
+  prometheus-central:
+    volumes:
+      - ./prometheus/single.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - bigip-mock
+      - blackbox-central

@@ -1,0 +1,8 @@
+services:
+  demo-app-zone-a:
+    environment:
+      DEMO_ERROR_RATE: "${DEMO_ERROR_RATE_ZONE_A:-0.15}"
+
+  demo-app-zone-b:
+    environment:
+      DEMO_ERROR_RATE: "${DEMO_ERROR_RATE_ZONE_B:-0.10}"

@@ -1,0 +1,96 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    zone: core
+    prometheus: prometheus-single
+
+scrape_configs:
+  - job_name: agent
+    static_configs:
+      - targets:
+          - bigip-mock:19100
+        labels:
+          zone: zone-a
+          role: infrastructure
+          target: agent-zone-a
+      - targets:
+          - bigip-mock:19101
+        labels:
+          zone: zone-b
+          role: infrastructure
+          target: agent-zone-b
+
+  - job_name: demo-app
+    static_configs:
+      - targets:
+          - bigip-mock:18081
+        labels:
+          zone: zone-a
+          role: application
+          service: payments-api
+      - targets:
+          - bigip-mock:18082
+        labels:
+          zone: zone-b
+          role: application
+          service: lending-api
+
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module:
+        - http_2xx
+    static_configs:
+      - targets:
+          - http://bigip-mock:19100/healthz
+          - http://bigip-mock:18081/healthz
+        labels:
+          zone: zone-a
+          probe_type: http
+      - targets:
+          - http://bigip-mock:19101/healthz
+          - http://bigip-mock:18082/healthz
+        labels:
+          zone: zone-b
+          probe_type: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-central:9115
+
+  - job_name: blackbox-tcp
+    metrics_path: /probe
+    params:
+      module:
+        - tcp_connect
+    static_configs:
+      - targets:
+          - bigip-mock:19100
+          - bigip-mock:18081
+        labels:
+          zone: zone-a
+          probe_type: tcp
+      - targets:
+          - bigip-mock:19101
+          - bigip-mock:18082
+        labels:
+          zone: zone-b
+          probe_type: tcp
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-central:9115
+
+  - job_name: central-prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+        labels:
+          zone: core

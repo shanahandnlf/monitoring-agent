@@ -25,6 +25,8 @@ type config struct {
 	ServiceName   string
 	LogstashURL   string
 	ErrorRate     float64
+	Hostname      string
+	HostIP        string
 }
 
 type demoApp struct {
@@ -50,6 +52,7 @@ type accessLog struct {
 	Service   string  `json:"service"`
 	Zone      string  `json:"zone"`
 	Hostname  string  `json:"hostname"`
+	HostIP    string  `json:"host_ip"`
 	RequestID string  `json:"request_id"`
 	Method    string  `json:"method"`
 	Path      string  `json:"path"`
@@ -87,9 +90,13 @@ func main() {
 }
 
 func newDemoApp(cfg config) *demoApp {
-	hostname, err := os.Hostname()
-	if err != nil || hostname == "" {
-		hostname = "unknown"
+	hostname := cfg.Hostname
+	if hostname == "" {
+		resolved, err := os.Hostname()
+		if err != nil || resolved == "" {
+			resolved = "unknown"
+		}
+		hostname = resolved
 	}
 
 	constLabels := prometheus.Labels{
@@ -147,7 +154,9 @@ func loadConfig(args []string) (config, error) {
 		Zone:          envString("DEMO_ZONE", "local"),
 		ServiceName:   envString("DEMO_SERVICE_NAME", "demo-app"),
 		LogstashURL:   envString("DEMO_LOGSTASH_URL", ""),
-		ErrorRate:     envFloat64("DEMO_ERROR_RATE", 0.15),
+		ErrorRate:     envFloat64("DEMO_ERROR_RATE", 0),
+		Hostname:      envString("DEMO_HOSTNAME", ""),
+		HostIP:        envString("DEMO_HOST_IP", ""),
 	}
 
 	flags := flag.NewFlagSet("demo-app", flag.ContinueOnError)
@@ -156,6 +165,8 @@ func loadConfig(args []string) (config, error) {
 	flags.StringVar(&cfg.ServiceName, "service-name", cfg.ServiceName, "Service name label for metrics and logs.")
 	flags.StringVar(&cfg.LogstashURL, "logstash-url", cfg.LogstashURL, "Optional Logstash HTTP input URL for JSON access logs.")
 	flags.Float64Var(&cfg.ErrorRate, "error-rate", cfg.ErrorRate, "Synthetic error rate between 0 and 1 for /api/demo.")
+	flags.StringVar(&cfg.Hostname, "hostname", cfg.Hostname, "Host identity for the metrics host label and log hostname field (defaults to OS hostname).")
+	flags.StringVar(&cfg.HostIP, "host-ip", cfg.HostIP, "Host IP address recorded in access logs for display.")
 
 	if err := flags.Parse(args); err != nil {
 		return config{}, err
@@ -199,6 +210,7 @@ func (a *demoApp) withAccessLog(next http.HandlerFunc) http.HandlerFunc {
 			Service:   a.cfg.ServiceName,
 			Zone:      a.cfg.Zone,
 			Hostname:  a.hostname,
+			HostIP:    a.cfg.HostIP,
 			RequestID: fmt.Sprintf("%s-%d", a.cfg.Zone, a.nextID.Add(1)),
 			Method:    r.Method,
 			Path:      path,

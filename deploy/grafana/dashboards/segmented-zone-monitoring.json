@@ -24,6 +24,94 @@
   "panels": [
     {
       "datasource": {
+        "type": "elasticsearch",
+        "uid": "elasticsearch-logs"
+      },
+      "description": "Notification badge for recent application 5xx alerts. The badge turns red when one or more 5xx log events are found in the last 5 minutes.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "No active alerts"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "displayName": "5xx"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "status:[500 TO 599] AND zone.keyword:/${zone:raw}/ AND hostname.keyword:/${host:raw}/",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "timeFrom": "5m",
+      "title": "🔔 Alert Notifications",
+      "type": "stat"
+    },
+    {
+      "datasource": {
         "type": "prometheus",
         "uid": "prometheus-central"
       },
@@ -49,7 +137,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
+        "w": 6,
         "x": 0,
         "y": 0
       },
@@ -71,7 +159,7 @@
       "pluginVersion": "11.1.0",
       "targets": [
         {
-          "expr": "sum by (zone) (up)",
+          "expr": "sum by (zone) (up{zone=~\"$zone\"})",
           "legendFormat": "{{zone}}",
           "refId": "A"
         }
@@ -110,8 +198,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
-        "x": 8,
+        "w": 7,
+        "x": 6,
         "y": 0
       },
       "id": 2,
@@ -128,8 +216,8 @@
       },
       "targets": [
         {
-          "expr": "system_cpu_usage_percent",
-          "legendFormat": "{{zone}} {{hostname}}",
+          "expr": "system_cpu_usage_percent{zone=~\"$zone\", host=~\"${host:raw}\"}",
+          "legendFormat": "{{zone}} {{host}} {{scope}} {{cpu}}",
           "refId": "A"
         }
       ],
@@ -167,8 +255,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
-        "x": 16,
+        "w": 7,
+        "x": 13,
         "y": 0
       },
       "id": 3,
@@ -185,8 +273,8 @@
       },
       "targets": [
         {
-          "expr": "system_memory_usage_percent",
-          "legendFormat": "{{zone}} {{hostname}}",
+          "expr": "system_memory_usage_percent{zone=~\"$zone\", host=~\"${host:raw}\"}",
+          "legendFormat": "{{zone}} {{host}}",
           "refId": "A"
         }
       ],
@@ -238,7 +326,7 @@
       },
       "targets": [
         {
-          "expr": "probe_success",
+          "expr": "probe_success{zone=~\"$zone\"}",
           "legendFormat": "{{zone}} {{probe_type}} {{instance}}",
           "refId": "A"
         }
@@ -287,12 +375,12 @@
       },
       "targets": [
         {
-          "expr": "rate(system_network_receive_bytes_total[1m])",
+          "expr": "rate(system_network_receive_bytes_total{zone=~\"$zone\", host=~\"${host:raw}\"}[1m])",
           "legendFormat": "rx {{zone}} {{interface}}",
           "refId": "A"
         },
         {
-          "expr": "rate(system_network_transmit_bytes_total[1m])",
+          "expr": "rate(system_network_transmit_bytes_total{zone=~\"$zone\", host=~\"${host:raw}\"}[1m])",
           "legendFormat": "tx {{zone}} {{interface}}",
           "refId": "B"
         }
@@ -302,8 +390,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus-central"
+        "type": "elasticsearch",
+        "uid": "elasticsearch-logs"
       },
       "fieldConfig": {
         "defaults": {
@@ -317,7 +405,7 @@
               }
             ]
           },
-          "unit": "reqps"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -341,18 +429,45 @@
       },
       "targets": [
         {
-          "expr": "sum by (zone, service) (rate(demo_app_requests_total[1m]))",
-          "legendFormat": "{{zone}} {{service}}",
-          "refId": "A"
+          "bucketAggs": [
+            {
+              "field": "service.keyword",
+              "id": "3",
+              "settings": {
+                "min_doc_count": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "size": "10"
+              },
+              "type": "terms"
+            },
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "service:* AND zone.keyword:/${zone:raw}/ AND hostname.keyword:/${host:raw}/ AND ${log_status:raw}",
+          "refId": "A",
+          "timeField": "@timestamp"
         }
       ],
-      "title": "Application Request Rate",
+      "title": "Application Requests from Elasticsearch",
       "type": "timeseries"
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus-central"
+        "type": "elasticsearch",
+        "uid": "elasticsearch-logs"
       },
       "fieldConfig": {
         "defaults": {
@@ -366,15 +481,15 @@
               },
               {
                 "color": "orange",
-                "value": 0.05
+                "value": 1
               },
               {
                 "color": "red",
-                "value": 0.15
+                "value": 5
               }
             ]
           },
-          "unit": "percentunit"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -398,18 +513,45 @@
       },
       "targets": [
         {
-          "expr": "sum by (zone, service) (rate(demo_app_errors_total[5m])) / sum by (zone, service) (rate(demo_app_requests_total[5m]))",
-          "legendFormat": "{{zone}} {{service}}",
-          "refId": "A"
+          "bucketAggs": [
+            {
+              "field": "service.keyword",
+              "id": "3",
+              "settings": {
+                "min_doc_count": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "size": "10"
+              },
+              "type": "terms"
+            },
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "status:[500 TO 599] AND zone.keyword:/${zone:raw}/ AND hostname.keyword:/${host:raw}/",
+          "refId": "A",
+          "timeField": "@timestamp"
         }
       ],
-      "title": "Application Error Rate",
+      "title": "Application 5xx Errors from Elasticsearch",
       "type": "timeseries"
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus-central"
+        "type": "elasticsearch",
+        "uid": "elasticsearch-logs"
       },
       "fieldConfig": {
         "defaults": {
@@ -431,7 +573,7 @@
               }
             ]
           },
-          "unit": "s"
+          "unit": "ms"
         },
         "overrides": []
       },
@@ -455,12 +597,45 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, zone, service) (rate(demo_app_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "p95 {{zone}} {{service}}",
-          "refId": "A"
+          "bucketAggs": [
+            {
+              "field": "service.keyword",
+              "id": "3",
+              "settings": {
+                "min_doc_count": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "size": "10"
+              },
+              "type": "terms"
+            },
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "metrics": [
+            {
+              "field": "latency_ms",
+              "id": "1",
+              "settings": {
+                "percents": [
+                  "95"
+                ]
+              },
+              "type": "percentiles"
+            }
+          ],
+          "query": "service:* AND zone.keyword:/${zone:raw}/ AND hostname.keyword:/${host:raw}/ AND ${log_status:raw}",
+          "refId": "A",
+          "timeField": "@timestamp"
         }
       ],
-      "title": "Application Latency p95",
+      "title": "Application Latency p95 from Elasticsearch",
       "type": "timeseries"
     },
     {
@@ -494,13 +669,224 @@
               "type": "logs"
             }
           ],
-          "query": "service:*",
+          "query": "service:* AND zone.keyword:/${zone:raw}/ AND hostname.keyword:/${host:raw}/ AND ${log_status:raw}",
           "refId": "A",
           "timeField": "@timestamp"
         }
       ],
       "title": "Application Logs from Elasticsearch",
       "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-central"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "pps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "system_network_receive_packets_per_second{zone=~\"$zone\", host=~\"${host:raw}\"}",
+          "legendFormat": "rx {{zone}} {{interface}}",
+          "refId": "A"
+        },
+        {
+          "expr": "system_network_transmit_packets_per_second{zone=~\"$zone\", host=~\"${host:raw}\"}",
+          "legendFormat": "tx {{zone}} {{interface}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Network Packet Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-central"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "eps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "system_network_receive_errors_per_second{zone=~\"$zone\", host=~\"${host:raw}\"}",
+          "legendFormat": "rx errors {{zone}} {{interface}}",
+          "refId": "A"
+        },
+        {
+          "expr": "system_network_transmit_errors_per_second{zone=~\"$zone\", host=~\"${host:raw}\"}",
+          "legendFormat": "tx errors {{zone}} {{interface}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Network Error Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-central"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "system_memory_used_bytes{zone=~\"$zone\", host=~\"${host:raw}\"}",
+          "legendFormat": "used {{zone}} {{host}}",
+          "refId": "A"
+        },
+        {
+          "expr": "system_memory_available_bytes{zone=~\"$zone\", host=~\"${host:raw}\"}",
+          "legendFormat": "available {{zone}} {{host}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Memory Used and Available",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-central"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "system_swap_usage_percent{zone=~\"$zone\", host=~\"${host:raw}\"}",
+          "legendFormat": "swap {{zone}} {{host}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Swap Usage",
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",
@@ -511,7 +897,99 @@
     "poc"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "allValue": null,
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": ".*"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Zone",
+        "multi": false,
+        "name": "zone",
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": ".*"
+          },
+          {
+            "selected": false,
+            "text": "zone-a",
+            "value": "zone-a"
+          },
+          {
+            "selected": false,
+            "text": "zone-b",
+            "value": "zone-b"
+          }
+        ],
+        "query": "All : .*, zone-a : zone-a, zone-b : zone-b",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus-central"
+        },
+        "definition": "label_values(system_cpu_usage_percent, host)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Host",
+        "multi": false,
+        "name": "host",
+        "options": [],
+        "query": {
+          "query": "label_values(system_cpu_usage_percent, host)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": null,
+        "current": {
+          "selected": true,
+          "text": "All logs",
+          "value": "status:*"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Log Status",
+        "multi": false,
+        "name": "log_status",
+        "options": [
+          {
+            "selected": true,
+            "text": "All logs",
+            "value": "status:*"
+          },
+          {
+            "selected": false,
+            "text": "5xx errors only",
+            "value": "status:[500 TO 599]"
+          }
+        ],
+        "query": "All logs : status:*, 5xx errors only : status:[500 TO 599]",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
   },
   "time": {
     "from": "now-30m",

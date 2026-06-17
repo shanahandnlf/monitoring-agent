@@ -2,6 +2,7 @@ package collector
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/shirou/gopsutil/v4/cpu"
 )
@@ -26,15 +27,36 @@ func (c *CPUCollector) Collect() ([]Metric, error) {
 		return nil, fmt.Errorf("cpu percent overall: no samples returned")
 	}
 
-	return []Metric{
+	perCore, err := cpu.Percent(0, true)
+	if err != nil {
+		return nil, fmt.Errorf("cpu percent per core: %w", err)
+	}
+
+	metrics := []Metric{
 		{
 			Name:  "system_cpu_usage_percent",
-			Help:  "Overall CPU usage percentage.",
+			Help:  "CPU usage percentage.",
 			Type:  GaugeMetric,
 			Value: overall[0],
 			Labels: map[string]string{
 				"scope": "overall",
+				"cpu":   "all",
 			},
 		},
-	}, nil
+	}
+
+	for index, value := range perCore {
+		metrics = append(metrics, Metric{
+			Name:  "system_cpu_usage_percent",
+			Help:  "CPU usage percentage.",
+			Type:  GaugeMetric,
+			Value: value,
+			Labels: map[string]string{
+				"scope": "core",
+				"cpu":   strconv.Itoa(index),
+			},
+		})
+	}
+
+	return metrics, nil
 }

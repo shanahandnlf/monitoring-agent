@@ -40,3 +40,17 @@ func TestCalculateUtilizationPercentHandlesCounterReset(t *testing.T) {
 		t.Fatalf("calculateUtilizationPercent() = %v, want 0", got)
 	}
 }
+
+func TestCalculateCounterRate(t *testing.T) {
+	got := calculateCounterRate(100, 250, time.Unix(0, 0), time.Unix(3, 0))
+	if got != 50 {
+		t.Fatalf("calculateCounterRate() = %v, want 50", got)
+	}
+}
+
+func TestCalculateCounterRateHandlesCounterReset(t *testing.T) {
+	got := calculateCounterRate(250, 100, time.Unix(0, 0), time.Unix(3, 0))
+	if got != 0 {
+		t.Fatalf("calculateCounterRate() = %v, want 0", got)
+	}
+}
