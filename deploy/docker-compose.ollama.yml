@@ -1,0 +1,48 @@
+services:
+  ollama:
+    image: ollama/ollama:0.5.7
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "ollama serve & until ollama ls >/dev/null 2>&1; do sleep 1; done; ollama pull ${OLLAMA_MODEL:-llama3.2:3b}; wait"
+    environment:
+      OLLAMA_KEEP_ALIVE: "5m"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    mem_limit: 6g
+    networks:
+      - core_net
+
+  insight:
+    image: monitoring-insight:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        APP: insight
+    hostname: insight
+    environment:
+      INSIGHT_LISTEN_ADDRESS: :8090
+      INSIGHT_INTERVAL: 5m
+      INSIGHT_LOG_WINDOW: 15m
+      INSIGHT_MAX_LOG_LINES: "20"
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+      OLLAMA_TIMEOUT: 60s
+      DD_API_KEY: ${DD_API_KEY:-}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+    ports:
+      - "8090:8090"
+    depends_on:
+      - elasticsearch
+      - ollama
+    networks:
+      - core_net
+
+volumes:
+  ollama_models:

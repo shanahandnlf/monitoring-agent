@@ -26,3 +26,15 @@ datasources:
     type: tempo
     access: proxy
     url: http://tempo:3200
+
+  - name: AI Insights
+    uid: elasticsearch-insights
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    jsonData:
+      esVersion: 8
+      index: "[monitoring-insights-]YYYY.MM.DD"
+      interval: Daily
+      timeField: "@timestamp"
+      logMessageField: summary

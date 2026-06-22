@@ -25,11 +25,14 @@ Pastikan sudah tersedia:
 
 ## Cara Menjalankan
 
-Project ini punya tiga mode sesuai opsi arsitektur:
+Project ini punya beberapa mode sesuai opsi arsitektur:
 
 - Opsi 1: `Single Prometheus + Agent + ELK`
 - Opsi 2: `Federated Prometheus + Agent + ELK`
 - Opsi 3: `Datadog (SaaS)` — metrics + logs + APM ke cloud Datadog (butuh `DD_API_KEY`)
+- Opsi Tracing: `Federated + Grafana Tempo` — distributed tracing on-prem (OpenTelemetry)
+- Opsi AI: `Ollama` — ringkasan log otomatis berbasis LLM lokal (on-prem)
+- Semua sekaligus: `up-all` — stack + Tempo + Ollama dalam satu project
 
 Semua memakai port host yang sama (`3000`, `9090`, `9200`, dan lainnya), jadi jalankan salah satu opsi saja dalam satu waktu.
 
@@ -40,6 +43,9 @@ Pilih salah satu cara jalan:
 | Federated via Makefile | `make up-federated` | `make down-federated` | `make errors-on-federated` / `make errors-off-federated` |
 | Single via Makefile | `make up-single` | `make down-single` | `make errors-on-single` / `make errors-off-single` |
 | Datadog via Makefile | `make up-datadog` | `make down-datadog` | - |
+| Tracing (Tempo) via Makefile | `make up-tracing` | `make down-tracing` | `make errors-on` / `make errors-off` |
+| Ollama (AI) via Makefile | `make up-ollama` | `make down-ollama` | `make errors-on` / `make errors-off` |
+| Semua (all) via Makefile | `make up-all` | `make down-ollama` | `make errors-on` / `make errors-off` |
 | Manual Docker Compose | `docker compose -f deploy/docker-compose.yml up --build` | `docker compose -f deploy/docker-compose.yml down` | `make errors-on` / `make errors-off` |
 
 ### Opsi 1 - Single Prometheus
@@ -109,6 +115,42 @@ Cek di Datadog (sesuai region `DD_SITE`):
 - **APM > Traces / Services**: filter `env:poc`
 
 Detail lengkap (limitasi free tier, on-premise, setup APM/tracing) ada di [docs/opsi-3-datadog.md](docs/opsi-3-datadog.md) dan [docs/opsi-tracing.md](docs/opsi-tracing.md).
+
+### Opsi Tracing - Grafana Tempo
+
+Menjalankan stack federated + **Grafana Tempo** untuk distributed tracing on-prem. demo-app diinstrumentasi OpenTelemetry; trace dikirim ke Tempo via OTLP dan tampil di panel Grafana **"Recent Traces from Tempo"** (Explore juga bisa). Satu request `/api/demo` menghasilkan waterfall berlapis: `GET /api/demo` → `process-demo` → `authorize` / `validate-request` / `query-database` → `db.query` / `call-downstream`.
+
+```bash
+make up-tracing
+make down-tracing
+```
+
+Instrumentasi bersifat opt-in (aktif lewat `OTEL_EXPORTER_OTLP_ENDPOINT`), jadi opsi lain tidak terpengaruh. Detail di [docs/opsi-tracing.md](docs/opsi-tracing.md).
+
+### Opsi AI - Ollama (Log Insights)
+
+Menambahkan ringkasan log otomatis berbasis LLM lokal (**Ollama**). Service `insight` membaca log error dari Elasticsearch secara periodik, merangkum dengan model `llama3.2:3b`, lalu menyimpan hasilnya kembali ke Elasticsearch untuk ditampilkan di panel Grafana **"AI Log Insights (Ollama)"**. Seluruhnya berjalan on-prem/offline, gratis, tanpa API key.
+
+```bash
+make up-ollama       # stack + ollama + insight (model di-pull otomatis saat pertama)
+curl -XPOST http://localhost:8090/summarize   # picu ringkasan langsung
+make logs-ollama
+make down-ollama
+```
+
+LLM tidak pernah di hot path (hanya batch/on-demand, model kecil CPU-friendly), jadi tidak membebani agent maupun demo-app. Detail di [docs/opsi-ollama.md](docs/opsi-ollama.md).
+
+Opsional, ringkasan AI bisa **diteruskan ke Datadog** sekaligus (selain ke Elasticsearch): jika `DD_API_KEY` di `.env` terisi, service `insight` mengirim ringkasan ke Datadog Logs HTTP intake (lihat di **Logs → Search**, filter `source:insight`). Catatan: ini mengirim data ke cloud, jadi hanya cocok bila server terhubung internet.
+
+### Semua sekaligus - `make up-all`
+
+Menjalankan semua pilar dalam satu project: metrics (Prometheus) + logs (ELK) + **tracing (Tempo)** + **AI insights (Ollama)**. Cocok untuk demo di mana semua panel Grafana terisi sekaligus.
+
+```bash
+make up-all          # stack + Tempo + Ollama + insight
+make errors-on       # (opsional) generate 5xx untuk bahan trace error + ringkasan AI
+make down-ollama     # menghentikan project (project sama dengan up-ollama)
+```
 
 Stop semua project opsi:
 

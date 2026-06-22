@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -19,6 +20,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type config struct {
@@ -251,13 +253,40 @@ func (a *demoApp) handleDemo(w http.ResponseWriter, r *http.Request) {
 
 	a.rngMu.Lock()
 	isError := a.rng.Float64() < a.cfg.ErrorRate
-	sleepFor := time.Duration(50+a.rng.Intn(250)) * time.Millisecond
 	a.rngMu.Unlock()
 
-	_, span := otel.Tracer("demo-app").Start(r.Context(), "process-demo")
+	tracer := otel.Tracer("demo-app")
+	ctx, span := tracer.Start(r.Context(), "process-demo")
 	span.SetAttributes(attribute.Bool("demo.synthetic_error", isError))
-	time.Sleep(sleepFor)
-	span.End()
+	defer span.End()
+
+	a.traceStep(ctx, "authorize", 10, 30,
+		attribute.String("auth.method", "jwt"))
+
+	a.traceStep(ctx, "validate-request", 5, 20)
+
+	func() {
+		dbCtx, dbSpan := tracer.Start(ctx, "query-database")
+		dbSpan.SetAttributes(attribute.String("db.system", "postgresql"))
+		defer dbSpan.End()
+		a.traceStep(dbCtx, "db.query SELECT accounts", 20, 80,
+			attribute.String("db.statement", "SELECT * FROM accounts WHERE zone = $1"))
+	}()
+
+	func() {
+		dsCtx, dsSpan := tracer.Start(ctx, "call-downstream")
+		dsSpan.SetAttributes(attribute.String("peer.service", "ledger-api"))
+		defer dsSpan.End()
+		a.traceStep(dsCtx, "http GET ledger-api", 15, 60)
+		if isError {
+			dsSpan.SetStatus(codes.Error, "downstream returned 500")
+			dsSpan.RecordError(errors.New("synthetic downstream failure"))
+		}
+	}()
+
+	if isError {
+		span.SetStatus(codes.Error, "request failed")
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if isError {
@@ -277,6 +306,20 @@ func (a *demoApp) handleDemo(w http.ResponseWriter, r *http.Request) {
 		"zone":    a.cfg.Zone,
 		"service": a.cfg.ServiceName,
 	})
+}
+
+func (a *demoApp) traceStep(ctx context.Context, name string, minMS, maxMS int, attrs ...attribute.KeyValue) {
+	_, span := otel.Tracer("demo-app").Start(ctx, name)
+	if len(attrs) > 0 {
+		span.SetAttributes(attrs...)
+	}
+
+	a.rngMu.Lock()
+	delay := time.Duration(minMS+a.rng.Intn(maxMS-minMS+1)) * time.Millisecond
+	a.rngMu.Unlock()
+
+	time.Sleep(delay)
+	span.End()
 }
 
 func (a *demoApp) emitAccessLog(entry accessLog) {

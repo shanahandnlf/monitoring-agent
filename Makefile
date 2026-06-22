@@ -4,10 +4,12 @@ SINGLE_FILE := deploy/docker-compose.single.yml
 ERRORS_FILE := deploy/docker-compose.errors.yml
 DATADOG_FILE := deploy/docker-compose.datadog.yml
 TRACING_FILE := deploy/docker-compose.tracing.yml
+OLLAMA_FILE := deploy/docker-compose.ollama.yml
 FEDERATED_PROJECT := monitoring-poc-federated
 SINGLE_PROJECT := monitoring-poc-single
 DATADOG_PROJECT := monitoring-poc-datadog
 TRACING_PROJECT := monitoring-poc-tracing
+OLLAMA_PROJECT := monitoring-poc-ollama
 DEMO_SERVICES := demo-app-zone-a demo-app-zone-b
 
 DATADOG_SERVICES := \
@@ -35,7 +37,7 @@ SINGLE_SERVICES := \
 	prometheus-central \
 	grafana
 
-.PHONY: help build build-linux build-windows up-single up-federated up-datadog up-tracing down-single down-federated down-datadog down-tracing down reset-federated reset-single reset-datadog reset-tracing ps-single ps-federated ps-datadog ps-tracing logs-single logs-federated logs-datadog logs-tracing errors-on errors-off errors-on-federated errors-off-federated errors-on-single errors-off-single test
+.PHONY: help build build-linux build-windows up-single up-federated up-datadog up-tracing up-ollama up-all down-single down-federated down-datadog down-tracing down-ollama down reset-federated reset-single reset-datadog reset-tracing reset-ollama ps-single ps-federated ps-datadog ps-tracing ps-ollama logs-single logs-federated logs-datadog logs-tracing logs-ollama errors-on errors-off errors-on-federated errors-off-federated errors-on-single errors-off-single test
 
 help:
 	@echo "Available targets:"
@@ -46,6 +48,8 @@ help:
 	@echo "  make up-federated   Run Opsi 2: Federated Prometheus + Agent + ELK"
 	@echo "  make up-datadog     Run Opsi 3: Datadog Agent (free tier, butuh DD_API_KEY di .env)"
 	@echo "  make up-tracing     Run Opsi 1/2 + Grafana Tempo (distributed tracing on-prem)"
+	@echo "  make up-ollama      Run Opsi AI: stack + Ollama + insight (ringkasan log on-prem)"
+	@echo "  make up-all         Run semua: stack + Tempo (tracing) + Ollama + insight"
 	@echo "  make down-single    Stop Opsi 1 containers"
 	@echo "  make down-federated Stop Opsi 2 containers"
 	@echo "  make down           Stop both option projects"
@@ -65,11 +69,13 @@ build:
 	mkdir -p bin
 	go build -o bin/agent ./cmd/agent
 	go build -o bin/demo-app ./cmd/demo-app
+	go build -o bin/insight ./cmd/insight
 
 build-linux:
 	mkdir -p bin/linux-amd64
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o bin/linux-amd64/agent ./cmd/agent
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o bin/linux-amd64/demo-app ./cmd/demo-app
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o bin/linux-amd64/insight ./cmd/insight
 
 build-windows:
 	mkdir -p bin/windows-amd64
@@ -157,6 +163,24 @@ ps-tracing:
 
 logs-tracing:
 	$(COMPOSE) -p $(TRACING_PROJECT) -f $(COMPOSE_FILE) -f $(TRACING_FILE) logs -f
+
+up-ollama:
+	$(COMPOSE) --env-file .env -p $(OLLAMA_PROJECT) -f $(COMPOSE_FILE) -f $(OLLAMA_FILE) up --build
+
+up-all:
+	$(COMPOSE) --env-file .env -p $(OLLAMA_PROJECT) -f $(COMPOSE_FILE) -f $(TRACING_FILE) -f $(OLLAMA_FILE) up --build
+
+down-ollama:
+	$(COMPOSE) --env-file .env -p $(OLLAMA_PROJECT) -f $(COMPOSE_FILE) -f $(OLLAMA_FILE) down
+
+reset-ollama:
+	$(COMPOSE) --env-file .env -p $(OLLAMA_PROJECT) -f $(COMPOSE_FILE) -f $(OLLAMA_FILE) down -v
+
+ps-ollama:
+	$(COMPOSE) --env-file .env -p $(OLLAMA_PROJECT) -f $(COMPOSE_FILE) -f $(OLLAMA_FILE) ps
+
+logs-ollama:
+	$(COMPOSE) --env-file .env -p $(OLLAMA_PROJECT) -f $(COMPOSE_FILE) -f $(OLLAMA_FILE) logs -f
 
 test:
 	go test ./...

@@ -18,8 +18,12 @@ echo "Building static Windows binaries..."
 CGO_ENABLED=0 GOOS=windows GOARCH="${GOARCH_VALUE}" go build -trimpath -ldflags="-s -w" -o "${WINDOWS_BIN_DIR}/agent.exe" "${ROOT_DIR}/cmd/agent"
 CGO_ENABLED=0 GOOS=windows GOARCH="${GOARCH_VALUE}" go build -trimpath -ldflags="-s -w" -o "${WINDOWS_BIN_DIR}/demo-app.exe" "${ROOT_DIR}/cmd/demo-app"
 
+echo "Building static Linux insight binary..."
+CGO_ENABLED=0 GOOS=linux GOARCH="${GOARCH_VALUE}" go build -trimpath -ldflags="-s -w" -o "${LINUX_BIN_DIR}/insight" "${ROOT_DIR}/cmd/insight"
+
 echo "Building local Docker images..."
 docker compose -f "${ROOT_DIR}/deploy/docker-compose.yml" build agent-zone-a demo-app-zone-a
+docker compose -p monitoring-poc-ollama -f "${ROOT_DIR}/deploy/docker-compose.yml" -f "${ROOT_DIR}/deploy/docker-compose.ollama.yml" build insight
 
 echo "Pulling third-party images..."
 for image in \
@@ -30,7 +34,8 @@ for image in \
   docker.elastic.co/logstash/logstash:8.15.0 \
   docker.elastic.co/kibana/kibana:8.15.0 \
   haproxy:2.9-alpine \
-  curlimages/curl:8.9.1
+  curlimages/curl:8.9.1 \
+  ollama/ollama:0.5.7
 do
   docker pull "${image}"
 done
@@ -39,6 +44,7 @@ echo "Saving image bundle to ${IMAGE_TAR}..."
 docker save \
   monitoring-agent:local \
   monitoring-demo-app:local \
+  monitoring-insight:local \
   prom/prometheus:v2.52.0 \
   prom/blackbox-exporter:v0.25.0 \
   grafana/grafana:11.1.0 \
@@ -47,11 +53,19 @@ docker save \
   docker.elastic.co/kibana/kibana:8.15.0 \
   haproxy:2.9-alpine \
   curlimages/curl:8.9.1 \
+  ollama/ollama:0.5.7 \
   -o "${IMAGE_TAR}"
+
+echo "NOTE: Ollama image hanya berisi runtime, BUKAN model. Untuk deploy offline,"
+echo "  jalankan 'make up-ollama' saat masih ada internet agar model ter-pull ke"
+echo "  volume, lalu arsipkan volume model (mis. docker run --rm -v"
+echo "  monitoring-poc-ollama_ollama_models:/m -v \$PWD:/out alpine tar czf"
+echo "  /out/ollama-models.tar.gz -C /m .) dan pulihkan di server tujuan."
 
 echo "Offline bundle ready:"
 echo "  ${LINUX_BIN_DIR}/agent"
 echo "  ${LINUX_BIN_DIR}/demo-app"
+echo "  ${LINUX_BIN_DIR}/insight"
 echo "  ${WINDOWS_BIN_DIR}/agent.exe"
 echo "  ${WINDOWS_BIN_DIR}/demo-app.exe"
 echo "  ${IMAGE_TAR}"
