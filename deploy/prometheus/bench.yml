@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    role: bench
+
+scrape_configs:
+  - job_name: avalanche-fleet
+    dns_sd_configs:
+      - names: ['avalanche']
+        type: A
+        port: 9001
+        refresh_interval: 15s
+
+  - job_name: prometheus-bench
+    static_configs:
+      - targets: ['localhost:9090']

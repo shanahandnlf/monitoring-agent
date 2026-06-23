@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	gopsutilnet "github.com/shirou/gopsutil/v4/net"
+	gopsutilnet "github.com/shirou/gopsutil/v3/net"
 )
 
 type NetworkCollector struct {

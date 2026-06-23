@@ -1,0 +1,16 @@
+filebeat.inputs:
+  - type: filestream
+    id: win-eventlog-demo
+    paths:
+      - /demo/sample-events.ndjson
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+
+filebeat.registry.path: /tmp/filebeat-registry
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: info

@@ -1,0 +1,38 @@
+name: monitoring-bench
+
+services:
+  avalanche:
+    image: quay.io/prometheuscommunity/avalanche:latest
+    command:
+      - --gauge-metric-count=${BENCH_METRIC_COUNT:-200}
+      - --series-count=${BENCH_SERIES_COUNT:-500}
+      - --label-count=5
+      - --value-interval=15
+      - --series-interval=3600
+      - --metric-interval=3600
+      - --port=9001
+    networks:
+      - bench_net
+
+  prometheus-bench:
+    image: prom/prometheus:v2.52.0
+    depends_on:
+      - avalanche
+    volumes:
+      - ./prometheus/bench.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_bench_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=2d
+      - --web.enable-lifecycle
+    ports:
+      - "9094:9090"
+    networks:
+      - bench_net
+
+networks:
+  bench_net:
+
+volumes:
+  prometheus_bench_data:

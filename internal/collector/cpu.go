@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v3/cpu"
 )
 
 type CPUCollector struct{}

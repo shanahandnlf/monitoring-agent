@@ -1,0 +1,28 @@
+# Winlogbeat reference config for REAL Windows hosts (Server 2008 R2+).
+# Install Winlogbeat as a service on each Windows server, point it at Logstash's
+# beats input (port 5044), and it ships Event Log entries into the same ELK as
+# the application logs. Channels below cover service crashes / app errors.
+#
+# Install (PowerShell, as admin):
+#   .\install-service-winlogbeat.ps1
+#   Start-Service winlogbeat
+#
+# For Windows Server 2008 use a Winlogbeat 7.x build (8.x needs newer Windows).
+
+winlogbeat.event_logs:
+  - name: System
+  - name: Application
+  - name: Security
+    ignore_older: 72h
+
+# Ship to Logstash beats input (replace host with the F5 VIP / Logstash address).
+output.logstash:
+  hosts: ["logstash.monitoring.local:5044"]
+
+# Optional: send directly to Elasticsearch instead of Logstash.
+# output.elasticsearch:
+#   hosts: ["http://elasticsearch.monitoring.local:9200"]
+#   index: "windows-eventlog-%{+yyyy.MM.dd}"
+
+logging.level: info
+logging.to_files: true

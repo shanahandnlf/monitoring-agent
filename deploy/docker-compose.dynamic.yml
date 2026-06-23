@@ -1,0 +1,42 @@
+services:
+  agent-zone-a:
+    labels:
+      prometheus.scrape: "true"
+      prometheus.port: "9100"
+      zone: zone-a
+      role: infrastructure
+
+  agent-zone-b:
+    labels:
+      prometheus.scrape: "true"
+      prometheus.port: "9100"
+      zone: zone-b
+      role: infrastructure
+
+  demo-app-zone-a:
+    labels:
+      prometheus.scrape: "true"
+      prometheus.port: "8080"
+      zone: zone-a
+      role: application
+      service: payments-api
+
+  demo-app-zone-b:
+    labels:
+      prometheus.scrape: "true"
+      prometheus.port: "8080"
+      zone: zone-b
+      role: application
+      service: lending-api
+
+  prometheus-zone-a:
+    user: "0:0"
+    volumes:
+      - ./prometheus/zone-a-dynamic.yml:/etc/prometheus/prometheus.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  prometheus-zone-b:
+    user: "0:0"
+    volumes:
+      - ./prometheus/zone-b-dynamic.yml:/etc/prometheus/prometheus.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro

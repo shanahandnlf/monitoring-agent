@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	promcollectors "github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/shanahandnlf/monitoring-agent.git/internal/collector"
@@ -36,6 +37,11 @@ func main() {
 	if err := registry.Register(agentexporter.NewPrometheusExporter(collectors, cfg.BaseLabels())); err != nil {
 		log.Fatalf("register prometheus exporter: %v", err)
 	}
+
+	registry.MustRegister(
+		promcollectors.NewGoCollector(),
+		promcollectors.NewProcessCollector(promcollectors.ProcessCollectorOpts{}),
+	)
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))

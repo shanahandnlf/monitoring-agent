@@ -14,6 +14,12 @@ services:
     ports:
       - "11434:11434"
     mem_limit: 6g
+    healthcheck:
+      test: ["CMD-SHELL", "ollama show \"$${OLLAMA_MODEL:-llama3.2:3b}\" >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
     networks:
       - core_net
 
@@ -39,8 +45,10 @@ services:
     ports:
       - "8090:8090"
     depends_on:
-      - elasticsearch
-      - ollama
+      elasticsearch:
+        condition: service_started
+      ollama:
+        condition: service_healthy
     networks:
       - core_net
 

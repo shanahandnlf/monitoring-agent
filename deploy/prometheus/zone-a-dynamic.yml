@@ -1,0 +1,89 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    zone: zone-a
+    prometheus: prometheus-zone-a
+
+scrape_configs:
+  - job_name: docker-dynamic
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+    relabel_configs:
+      - source_labels: [__meta_docker_container_label_prometheus_scrape]
+        regex: "true"
+        action: keep
+      - source_labels: [__meta_docker_network_name]
+        regex: ".*zone_a_net"
+        action: keep
+      - source_labels: [__meta_docker_network_ip, __meta_docker_container_label_prometheus_port]
+        regex: "(.+);(.+)"
+        replacement: "$1:$2"
+        target_label: __address__
+      - source_labels: [__meta_docker_container_label_zone]
+        target_label: zone
+      - source_labels: [__meta_docker_container_label_role]
+        target_label: role
+      - source_labels: [__meta_docker_container_label_service]
+        target_label: service
+
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module:
+        - http_2xx
+    static_configs:
+      - targets:
+          - http://agent-zone-a:9100/healthz
+          - http://demo-app-zone-a:8080/healthz
+        labels:
+          zone: zone-a
+          probe_type: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-zone-a:9115
+
+  - job_name: blackbox-tcp
+    metrics_path: /probe
+    params:
+      module:
+        - tcp_connect
+    static_configs:
+      - targets:
+          - agent-zone-a:9100
+          - demo-app-zone-a:8080
+        labels:
+          zone: zone-a
+          probe_type: tcp
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-zone-a:9115
+
+  - job_name: blackbox-icmp
+    metrics_path: /probe
+    params:
+      module:
+        - icmp
+    static_configs:
+      - targets:
+          - agent-zone-a
+          - demo-app-zone-a
+        labels:
+          zone: zone-a
+          probe_type: icmp
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-zone-a:9115

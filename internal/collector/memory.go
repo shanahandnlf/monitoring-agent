@@ -3,7 +3,7 @@ package collector
 import (
 	"fmt"
 
-	"github.com/shirou/gopsutil/v4/mem"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 type MemoryCollector struct{}

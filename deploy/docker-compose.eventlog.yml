@@ -1,0 +1,14 @@
+# Local demo of Windows Event Log -> ELK without a real Windows host: a Filebeat
+# container ships synthetic Windows events into the Logstash beats input (5044).
+services:
+  filebeat-eventlog-demo:
+    image: docker.elastic.co/beats/filebeat:8.15.0
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      - ./elk/winlogbeat/filebeat.demo.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./elk/winlogbeat/sample-events.ndjson:/demo/sample-events.ndjson:ro
+    depends_on:
+      - logstash
+    networks:
+      - core_net

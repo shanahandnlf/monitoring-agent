@@ -45,7 +45,7 @@ Pilih salah satu cara jalan:
 | Datadog via Makefile | `make up-datadog` | `make down-datadog` | - |
 | Tracing (Tempo) via Makefile | `make up-tracing` | `make down-tracing` | `make errors-on` / `make errors-off` |
 | Ollama (AI) via Makefile | `make up-ollama` | `make down-ollama` | `make errors-on` / `make errors-off` |
-| Semua (all) via Makefile | `make up-all` | `make down-ollama` | `make errors-on` / `make errors-off` |
+| Semua (all) via Makefile | `make up-all` | `make down-all` | `make errors-on-all` / `make errors-off-all` |
 | Manual Docker Compose | `docker compose -f deploy/docker-compose.yml up --build` | `docker compose -f deploy/docker-compose.yml down` | `make errors-on` / `make errors-off` |
 
 ### Opsi 1 - Single Prometheus
@@ -133,10 +133,13 @@ Menambahkan ringkasan log otomatis berbasis LLM lokal (**Ollama**). Service `ins
 
 ```bash
 make up-ollama       # stack + ollama + insight (model di-pull otomatis saat pertama)
+docker compose --env-file .env -p monitoring-poc-ollama -f deploy/docker-compose.yml -f deploy/docker-compose.ollama.yml exec ollama ollama list
 curl -XPOST http://localhost:8090/summarize   # picu ringkasan langsung
 make logs-ollama
 make down-ollama
 ```
+
+Pada first run, tunggu sampai model `llama3.2:3b` muncul di `ollama list`. Kalau `/summarize` dipanggil saat pull model masih berjalan, Ollama akan membalas `model not found`.
 
 LLM tidak pernah di hot path (hanya batch/on-demand, model kecil CPU-friendly), jadi tidak membebani agent maupun demo-app. Detail di [docs/opsi-ollama.md](docs/opsi-ollama.md).
 
@@ -148,8 +151,9 @@ Menjalankan semua pilar dalam satu project: metrics (Prometheus) + logs (ELK) + 
 
 ```bash
 make up-all          # stack + Tempo + Ollama + insight
-make errors-on       # (opsional) generate 5xx untuk bahan trace error + ringkasan AI
-make down-ollama     # menghentikan project (project sama dengan up-ollama)
+docker compose --env-file .env -p monitoring-poc-all -f deploy/docker-compose.yml -f deploy/docker-compose.tracing.yml -f deploy/docker-compose.ollama.yml exec ollama ollama list
+make errors-on-all   # (opsional) generate 5xx untuk bahan trace error + ringkasan AI
+make down-all
 ```
 
 Stop semua project opsi:
@@ -602,17 +606,55 @@ docker compose -f deploy/docker-compose.yml down -v
 
 ## Build Binary
 
-Kalau hanya ingin build binary Go:
+Ada **dua varian agent** (kontrak metrik/endpoint identik, beda toolchain & target OS):
+
+| Varian | Sumber | Toolchain | Target OS | Output build |
+| --- | --- | --- | --- | --- |
+| **Agent utama** (gopsutil) | `cmd/agent/` | Go 1.20 | Linux (lama→baru) + **Windows Server 2008 R2 → terbaru** | `bin/agent`, `bin/linux-amd64/agent`, `bin/windows-amd64/agent.exe` |
+| **Agent legacy 2008** (hand-rolled) | `agent-2008/` | Go 1.10.8 | **Windows Server 2008 non-R2** (Vista-class) | `bin/windows-2008/agent-2008-win{32,64}.exe` |
+
+Detail: [`docs/opsi-windows-2008.md`](docs/opsi-windows-2008.md).
 
 ```bash
-go test ./...
-make build
-make build-linux
-make build-windows
+make test            # go1.20 test ./...
+make build           # host
+make build-linux     # agent utama -> linux/amd64
+make build-windows   # agent utama -> windows/amd64 (jalan di Server 2008 R2+)
+make build-agent-2008 # agent legacy -> windows 386+amd64 (Server 2008 non-R2, via Docker)
 ```
 
 Untuk membuat bundle offline berisi image Docker dan binary static Linux/Windows:
 
 ```bash
 scripts/offline-bundle.sh
+```
+
+## Benchmark & Stress Test
+
+Mengukur dua hal: agent ringan, dan backend sanggup ~500 server. Detail metodologi,
+query, dan hasil ada di [`docs/benchmark.md`](docs/benchmark.md). Butuh `go1.20`
+(`go install golang.org/dl/go1.20@latest && go1.20 download`) dan Docker.
+
+Footprint agent (Lapisan 1):
+
+```bash
+make bench-agent                                  # biaya per-scrape (ns/op, allocs/op)
+make build && AGENT_ZONE=bench ./bin/agent &      # start agent
+make bench-k6-agent                               # k6 load /metrics (p95/p99, RPS)
+```
+
+Kapasitas metrics 500 server (Lapisan 2, Avalanche → Prometheus bench):
+
+```bash
+make bench-fleet                                  # ~100k series; buka http://localhost:9094
+make bench-scale SCALE=20                          # cross-check agent nyata via docker_sd
+make bench-fleet-down                             # stop + bersih
+```
+
+Kapasitas log 500 server (Lapisan 3, k6 → demo-app → ELK):
+
+```bash
+make up-federated
+make bench-k6-logs LOG_RATE=200                   # traffic ke /api/demo
+curl 'localhost:9200/_cat/indices?v'              # pertumbuhan index untuk ekstrapolasi sizing
 ```
